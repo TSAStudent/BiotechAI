@@ -1,0 +1,114 @@
+const OpenAI = require("openai").default;
+
+function calculateStressLevel({ heartRate, sleepHoursLastNight, caffeineAfternoon, melatoninLevel }) {
+  let score = 5;
+  if (heartRate >= 85) score += 2;
+  else if (heartRate >= 75) score += 1;
+  else if (heartRate <= 55) score -= 1;
+  if (sleepHoursLastNight < 5) score += 2;
+  else if (sleepHoursLastNight < 6) score += 1;
+  else if (sleepHoursLastNight >= 8 && sleepHoursLastNight <= 9) score -= 0.5;
+  if (caffeineAfternoon === "yes") score += 1;
+  else if (caffeineAfternoon === "sometimes") score += 0.5;
+  const level = Math.round(Math.min(10, Math.max(1, score)));
+  const insight = `Calculated from your resting heart rate (${heartRate} bpm), sleep (${sleepHoursLastNight} hrs), and caffeine. ${heartRate > 75 ? "Elevated heart rate suggests elevated stress or poor recovery." : "Heart rate is in a relaxed range."} ${sleepHoursLastNight < 6 ? "Short sleep can raise stress." : ""}`.trim();
+  return { level, insight };
+}
+
+module.exports = async function handler(req, res) {
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+  if (req.method === "OPTIONS") return res.status(200).end();
+  if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
+
+  try {
+    const body = typeof req.body === "string" ? JSON.parse(req.body) : req.body || {};
+    const {
+      melatoninLevel,
+      heartRate,
+      sleepHoursLastNight,
+      bedTime,
+      wakeTime,
+      age,
+      caffeineAfternoon,
+    } = body;
+
+    const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+    if (!process.env.OPENAI_API_KEY) {
+      return res.status(500).json({ error: "OPENAI_API_KEY not configured" });
+    }
+
+    const prompt = `You are a sleep and circadian rhythm expert. Analyze this user data and respond in valid JSON only, no markdown or extra text.
+
+User data (no stress level given - you must infer it):
+- Melatonin level: ${melatoninLevel} pg/mL (picograms per milliliter, typical range ~0-100)
+- Resting heart rate: ${heartRate} bpm
+- Sleep last night: ${sleepHoursLastNight} hours (bed: ${bedTime}, wake: ${wakeTime})
+- Age: ${age || "not provided"}
+- Caffeine after 2pm: ${caffeineAfternoon ?? "not provided"}
+
+You MUST infer and return stress level (1-10) from: elevated heart rate, short or fragmented sleep, late/irregular schedule, caffeine, age, and melatonin. 1 = very relaxed, 10 = very stressed. Always include stressLevelDetected and stressInsight.
+
+Respond with this exact JSON structure (use double quotes, escape any quotes in strings):
+{
+  "needsMoreSleep": true or false,
+  "confidence": "high" or "medium" or "low",
+  "sleepVerdict": "One short sentence: do they need more sleep?",
+  "qualityScore": number 1-100,
+  "stressLevelDetected": number 1-10,
+  "stressInsight": "One or two sentences explaining why you inferred this stress level from their metrics",
+  "recommendations": ["recommendation 1", "recommendation 2", "recommendation 3"],
+  "idealBedtime": "HH:MM format suggestion",
+  "idealWakeTime": "HH:MM format suggestion",
+  "circadianInsight": "One paragraph on their circadian/melatonin timing",
+  "heartRateInsight": "One sentence on what their HR suggests for recovery",
+  "sleepDebtNote": "One sentence on sleep debt if relevant"
+}`;
+
+    const completion = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [
+        { role: "system", content: "You respond only with valid JSON. No markdown code blocks, no explanation outside the JSON." },
+        { role: "user", content: prompt },
+      ],
+      temperature: 0.4,
+    });
+
+    const raw = completion.choices[0]?.message?.content?.trim() || "{}";
+    const jsonStr = raw.replace(/^```json?\s*|\s*```$/g, "").trim();
+    let data;
+    try {
+      data = JSON.parse(jsonStr);
+    } catch (e) {
+      data = {
+        needsMoreSleep: true,
+        confidence: "low",
+        sleepVerdict: "Unable to parse detailed analysis. Consider getting more sleep and re-checking your metrics.",
+        qualityScore: 50,
+        recommendations: ["Ensure 7–9 hours of sleep.", "Keep a consistent sleep schedule.", "Limit caffeine after 2pm."],
+        idealBedtime: "22:30",
+        idealWakeTime: "06:30",
+        circadianInsight: "Consistent bed and wake times help align melatonin with your schedule.",
+        heartRateInsight: "Resting heart rate can reflect recovery; lower often indicates better rest.",
+        sleepDebtNote: "Try to catch up gradually with slightly earlier bedtimes.",
+      };
+    }
+
+    const calculatedStress = calculateStressLevel({
+      heartRate: Number(heartRate) || 70,
+      sleepHoursLastNight: Number(sleepHoursLastNight) || 7,
+      caffeineAfternoon: caffeineAfternoon || "no",
+      melatoninLevel: Number(melatoninLevel) || 20,
+    });
+    const aiStress = Number(data.stressLevelDetected);
+    const validAi = !Number.isNaN(aiStress) && aiStress >= 1 && aiStress <= 10;
+    data.stressLevelDetected = validAi ? Math.round(aiStress) : calculatedStress.level;
+    data.stressInsight = data.stressInsight || calculatedStress.insight;
+
+    return res.status(200).json(data);
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: "Analysis failed", details: err.message });
+  }
+};

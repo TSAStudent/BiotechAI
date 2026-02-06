@@ -1,0 +1,16 @@
+{
+  "name": "biotech-ai",
+  "private": true,
+  "scripts": {
+    "install:all": "npm install && cd server && npm install && cd ../client && npm install",
+    "server": "cd server && npm run dev",
+    "client": "cd client && npm run dev",
+    "dev": "concurrently \"npm run server\" \"npm run client\""
+  },
+  "dependencies": {
+    "openai": "^4.20.1"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}
