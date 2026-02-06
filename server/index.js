@@ -53,6 +53,8 @@ User data (no stress level given - you must infer it):
 
 You MUST infer and return stress level (1-10) from: elevated heart rate, short or fragmented sleep, late/irregular schedule, caffeine, age, and melatonin. 1 = very relaxed, 10 = very stressed. Always include stressLevelDetected and stressInsight.
 
+Give 3 recommendations. Each recommendation must be 2-4 sentences: explain why it matters for their data, then what to do and how. Be specific to their melatonin, heart rate, sleep amount, and schedule. Escape any double quotes inside strings with backslash.
+
 Respond with this exact JSON structure (use double quotes, escape any quotes in strings):
 {
   "needsMoreSleep": true or false,
@@ -61,7 +63,7 @@ Respond with this exact JSON structure (use double quotes, escape any quotes in 
   "qualityScore": number 1-100,
   "stressLevelDetected": number 1-10,
   "stressInsight": "One or two sentences explaining why you inferred this stress level from their metrics",
-  "recommendations": ["recommendation 1", "recommendation 2", "recommendation 3"],
+  "recommendations": ["Full first recommendation paragraph here.", "Full second recommendation paragraph here.", "Full third recommendation paragraph here."],
   "idealBedtime": "HH:MM format suggestion",
   "idealWakeTime": "HH:MM format suggestion",
   "circadianInsight": "One paragraph on their circadian/melatonin timing",

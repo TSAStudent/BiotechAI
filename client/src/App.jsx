@@ -344,16 +344,16 @@ export default function App() {
                 <h3 className="text-lg font-semibold text-white mb-4">
                   Recommendations
                 </h3>
-                <ul className="space-y-3">
+                <ul className="space-y-5">
                   {result.recommendations.map((rec, i) => (
                     <li
                       key={i}
-                      className="flex gap-3 text-slate-300"
+                      className="flex gap-3 text-slate-300 leading-relaxed"
                     >
-                      <span className="text-sleep-blue font-mono shrink-0">
+                      <span className="text-sleep-blue font-mono shrink-0 font-semibold">
                         {i + 1}.
                       </span>
-                      {rec}
+                      <span className="min-w-0">{rec}</span>
                     </li>
                   ))}
                 </ul>
