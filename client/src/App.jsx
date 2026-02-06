@@ -2,10 +2,21 @@ import { useState } from "react";
 
 const API_BASE = "/api";
 
+/** Compute sleep hours from bed and wake time (HH:MM). Assumes overnight if wake <= bed. */
+function sleepHoursFromTimes(bedTime, wakeTime) {
+  const [bH, bM] = (bedTime || "00:00").split(":").map(Number);
+  const [wH, wM] = (wakeTime || "00:00").split(":").map(Number);
+  const bedMins = bH * 60 + (bM || 0);
+  const wakeMins = wH * 60 + (wM || 0);
+  const dayMins = 24 * 60;
+  let mins = wakeMins <= bedMins ? dayMins - bedMins + wakeMins : wakeMins - bedMins;
+  if (mins < 0 || mins > dayMins) mins = 0;
+  return Math.round((mins / 60) * 2) / 2; // nearest 0.5
+}
+
 const defaultForm = {
   melatoninLevel: 20,
   heartRate: 65,
-  sleepHoursLastNight: 7,
   bedTime: "23:00",
   wakeTime: "06:00",
   age: "",
@@ -18,6 +29,8 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
+  const sleepHoursLastNight = sleepHoursFromTimes(form.bedTime, form.wakeTime);
+
   const update = (key, value) => {
     setForm((f) => ({ ...f, [key]: value }));
     setError(null);
@@ -28,7 +41,7 @@ export default function App() {
     setError(null);
     setResult(null);
     try {
-      const payload = { ...form };
+      const payload = { ...form, sleepHoursLastNight };
       const hr = payload.heartRate;
       if (hr === "" || hr == null || Number.isNaN(Number(hr))) {
         payload.heartRate = 65;
@@ -140,19 +153,13 @@ export default function App() {
                 Sleep last night (hours)
               </label>
               <input
-                type="number"
-                min="0"
-                max="14"
-                step="0.5"
-                value={form.sleepHoursLastNight}
-                onChange={(e) =>
-                  update(
-                    "sleepHoursLastNight",
-                    Math.min(14, Math.max(0, Number(e.target.value) || 0))
-                  )
-                }
-                className="w-full rounded-xl bg-night-700 border border-night-600 px-4 py-3 font-mono text-white focus:border-sleep-blue focus:ring-1 focus:ring-sleep-blue outline-none transition"
+                type="text"
+                readOnly
+                value={sleepHoursLastNight}
+                className="w-full rounded-xl bg-night-700 border border-night-600 px-4 py-3 font-mono text-white focus:ring-0 cursor-default opacity-90"
+                title="Calculated from bed and wake time"
               />
+              <p className="text-xs text-slate-500 mt-1">From bed and wake time</p>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
