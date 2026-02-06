@@ -28,10 +28,17 @@ export default function App() {
     setError(null);
     setResult(null);
     try {
+      const payload = { ...form };
+      const hr = payload.heartRate;
+      if (hr === "" || hr == null || Number.isNaN(Number(hr))) {
+        payload.heartRate = 65;
+      } else {
+        payload.heartRate = Math.min(120, Math.max(40, Number(hr)));
+      }
       const res = await fetch(`${API_BASE}/analyze`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
+        body: JSON.stringify(payload),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Analysis failed");
@@ -102,11 +109,27 @@ export default function App() {
                 type="number"
                 min="40"
                 max="120"
-                value={form.heartRate}
-                onChange={(e) =>
-                  update("heartRate", Math.min(120, Math.max(40, Number(e.target.value) || 60)))
-                }
-                className="w-full rounded-xl bg-night-700 border border-night-600 px-4 py-3 font-mono text-white focus:border-sleep-blue focus:ring-1 focus:ring-sleep-blue outline-none transition"
+                placeholder="40–120"
+                value={form.heartRate === "" ? "" : form.heartRate}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  if (v === "") {
+                    update("heartRate", "");
+                    return;
+                  }
+                  const n = Number(v);
+                  if (!Number.isNaN(n)) update("heartRate", n);
+                }}
+                onBlur={(e) => {
+                  const v = form.heartRate;
+                  if (v === "" || v == null) {
+                    update("heartRate", 65);
+                    return;
+                  }
+                  const n = Number(v);
+                  update("heartRate", Math.min(120, Math.max(40, Number.isNaN(n) ? 65 : n)));
+                }}
+                className="w-full rounded-xl bg-night-700 border border-night-600 px-4 py-3 font-mono text-white placeholder:text-slate-500 focus:border-sleep-blue focus:ring-1 focus:ring-sleep-blue outline-none transition"
               />
             </div>
           </div>
